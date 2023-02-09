@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/tkuchiki/faketime"
 )
 
@@ -23,6 +24,7 @@ var log logger.LOG
 
 // A global variable which lets the provision continue from where it left off if there was an abrupt stop and restart of application.
 var firstExecution bool
+var Secret config.Secret
 
 // Input:
 //
@@ -39,7 +41,7 @@ func init() {
 	log.Info.Println("Main module initialized")
 
 	firstExecution = true
-	configStruct, err := config.GetConfig("config.yaml")
+	configStruct, _, err := config.GetConfig("config.yaml")
 	if err != nil {
 		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
 		panic(err)
@@ -71,11 +73,15 @@ func main() {
 	var t = new(time.Time)
 	t_now := time.Now()
 	*t = time.Date(t_now.Year(), t_now.Month(), t_now.Day(), 0, 0, 0, 0, time.UTC)
-	configStruct, err := config.GetConfig("config.yaml")
+
+	configStruct, Secret, err := config.UpdateEncryptedCred("config.yaml", firstExecution, Secret)
 	if err != nil {
 		log.Panic.Println("The recommendation can not be made as there is an error in the validation of config file.", err)
 		panic(err)
 	}
+
+	go fileWatch("config.yaml", Secret)
+
 	// A periodic check if there is a change in master node to pick up incomplete provisioning
 	go periodicProvisionCheck(configStruct.UserConfig.PollingInterval, t)
 	ticker := time.Tick(time.Duration(configStruct.UserConfig.PollingInterval) * time.Second)
@@ -92,7 +98,7 @@ func main() {
 			firstExecution = false
 			// This function will be responsible for parsing the config file and fill in task_details struct.
 			var task = new(recommendation.TaskDetails)
-			configStruct, err := config.GetConfig("config.yaml")
+			configStruct, _, err := config.GetConfig("config.yaml")
 			if err != nil {
 				log.Error.Println("The recommendation can not be made as there is an error in the validation of config file.")
 				log.Error.Println(err.Error())
@@ -129,7 +135,7 @@ func periodicProvisionCheck(pollingInterval int, t *time.Time) {
 			if !previousMaster || firstExecution {
 				//                      if firstExecution {
 				firstExecution = false
-				configStruct, err := config.GetConfig("config.yaml")
+				configStruct, _, err := config.GetConfig("config.yaml")
 				if err != nil {
 					log.Warn.Println("Unable to get Config from GetConfig()", err)
 					return
@@ -165,4 +171,48 @@ func periodicProvisionCheck(pollingInterval int, t *time.Time) {
 		// Update the previousMaster for next loop
 		previousMaster = currentMaster
 	}
+}
+
+// Input :
+// filePath : Path of the config.yaml file
+// Secret : Secret present in the config structure
+//
+// Description :
+// This function monitors the config.yaml for any writes continuously and on
+// noticing a write event, updates the encrypted creds in the config file.
+func fileWatch(filePath string, Secret config.Secret) {
+	//Adding file watcher to detect the change in configuration
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Error.Println("Error while creating new fileWatcher : ", err)
+	}
+	defer watcher.Close()
+	done := make(chan bool)
+
+	//A go routine that keeps checking for change in configuration
+	go func() {
+		for {
+			select {
+			// watch for events
+			case event := <-watcher.Events:
+				log.Info.Println("EVENT! ", event)
+				time.Sleep(2 * time.Second)
+				_, sec, updateErr := config.UpdateEncryptedCred("config.yaml", false, Secret)
+				if updateErr != nil {
+					log.Panic.Println("ConfigStruct encryption failed : ", updateErr)
+				} else {
+					Secret = sec
+				}
+			case err := <-watcher.Errors:
+				log.Info.Println("Error in fileWatcher: ", err)
+			}
+		}
+	}()
+
+	// Adding fsnotify watcher to keep track of the changes in config file
+	if err := watcher.Add(filePath); err != nil {
+		log.Error.Println("Error while adding the config file changes to the fileWatcher :", err)
+	}
+
+	<-done
 }
