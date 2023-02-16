@@ -8,7 +8,9 @@ import (
 	"errors"
 	mrand "math/rand"
 	"os"
+	"scaling_manager/config"
 	"scaling_manager/logger"
+	osutils "scaling_manager/opensearchUtils"
 	utils "scaling_manager/utilities"
 	"strings"
 	"time"
@@ -17,17 +19,26 @@ import (
 var log = new(logger.LOG)
 var EncryptionSecret string
 var seed = time.Now().Unix()
+var SecretFilepath = ".secret.txt"
 
 // Initializing logger module
 func init() {
+	var osAdminPassword, osAdminUsername string
 	log.Init("logger")
 	log.Info.Println("Crypto module initiated")
 	mrand.Seed(seed)
-	err := CheckAndUpdateSecretFile("secret.txt", false)
-	if err != nil {
-		panic(err)
+	configStruct, _ := config.GetConfig()
+	if _, err := os.Stat(SecretFilepath); err == nil {
+		EncryptionSecret = GetEncryptionSecret()
+		osAdminUsername = GetDecryptedData(configStruct.ClusterDetails.OsCredentials.OsAdminUsername)
+		osAdminPassword = GetDecryptedData(configStruct.ClusterDetails.OsCredentials.OsAdminPassword)
+	} else {
+		osAdminUsername = configStruct.ClusterDetails.OsCredentials.OsAdminUsername
+		osAdminPassword = configStruct.ClusterDetails.OsCredentials.OsAdminPassword
 	}
 
+	osutils.InitializeOsClient(osAdminUsername, osAdminPassword)
+	UpdateSecretAndEncryptCreds(true, configStruct)
 }
 
 // bytes is used when creating ciphers for the string
@@ -55,9 +66,9 @@ func GeneratePassword() string {
 	return str
 }
 
-func GenerateAndScrambleSecret(filepath string) {
+func GenerateAndScrambleSecret() {
 	EncryptionSecret = GeneratePassword()
-	f, err := os.Create(filepath)
+	f, err := os.Create(SecretFilepath)
 	if err != nil {
 		log.Panic.Println("Error while creating secret file in master node: ", err)
 		panic(err)
@@ -71,67 +82,143 @@ func GenerateAndScrambleSecret(filepath string) {
 	}
 }
 
-// Input :
-// secret_filepath (string) : path for the secret file
-// file_handler (bool) : True, if this function is called from the file event handler,
-// False, otherwise
-//
-// Description :
-// This function returns the secret if present, else creates a secret file with scrambled
-// secret. This function will be called twice (at the beginning of the execution and when
-// there is any updates in the config file). When called at the beginning, the secret will
-// be generated only in the master node. The encrypted config file along with the scrambled
-// secret file will be sent to the other nodes. When called from the file event handler,
-// the secret will be generated in the node which invokes this event, and sends the secret
-// and config file to other nodes.
-//
-// Output :
-// Error (if any)
-func CheckAndUpdateSecretFile(secret_filepath string, file_handler bool) error {
-	if !file_handler {
-		if _, err := os.Stat(secret_filepath); err == nil {
-			data, err := os.ReadFile(secret_filepath)
-			if err != nil {
-				log.Panic.Println("Error reading the secret file")
-				return err
-			}
-			decoded_data, _ := Decode(string(data))
-			EncryptionSecret = getScrambledOrOriginalSecret(string(decoded_data), false)
+func GetEncryptionSecret() string {
+	data, err := os.ReadFile(SecretFilepath)
+	if err != nil {
+		log.Panic.Println("Error reading the secret file")
+		panic(err)
+	}
+	decoded_data, _ := Decode(string(data))
+	return getScrambledOrOriginalSecret(string(decoded_data), false)
+}
+
+func GetEncryptedConfigStruct(config_struct config.ConfigStruct) (config.ConfigStruct, error) {
+	var err error
+
+	config_struct.ClusterDetails.OsCredentials.OsAdminUsername, err = GetEncryptedData(config_struct.ClusterDetails.OsCredentials.OsAdminUsername)
+	if err != nil {
+		return config_struct, err
+	}
+
+	config_struct.ClusterDetails.OsCredentials.OsAdminPassword, err = GetEncryptedData(config_struct.ClusterDetails.OsCredentials.OsAdminPassword)
+	if err != nil {
+		return config_struct, err
+	}
+
+	config_struct.ClusterDetails.CloudCredentials.SecretKey, err = GetEncryptedData(config_struct.ClusterDetails.CloudCredentials.SecretKey)
+	if err != nil {
+		return config_struct, err
+	}
+
+	config_struct.ClusterDetails.CloudCredentials.AccessKey, err = GetEncryptedData(config_struct.ClusterDetails.CloudCredentials.AccessKey)
+	if err != nil {
+		return config_struct, err
+	}
+
+	return config_struct, nil
+}
+
+func GetDecryptedConfigStruct(config_struct config.ConfigStruct) config.ConfigStruct {
+	os_admin_username := GetDecryptedData(config_struct.ClusterDetails.OsCredentials.OsAdminUsername)
+	if os_admin_username != "" {
+		config_struct.ClusterDetails.OsCredentials.OsAdminUsername = os_admin_username
+	}
+	os_admin_password := GetDecryptedData(config_struct.ClusterDetails.OsCredentials.OsAdminPassword)
+	if os_admin_password != "" {
+		config_struct.ClusterDetails.OsCredentials.OsAdminPassword = os_admin_password
+	}
+
+	secret_key := GetDecryptedData(config_struct.ClusterDetails.CloudCredentials.SecretKey)
+	if secret_key != "" {
+		config_struct.ClusterDetails.CloudCredentials.SecretKey = secret_key
+	}
+	access_key := GetDecryptedData(config_struct.ClusterDetails.CloudCredentials.AccessKey)
+	if access_key != "" {
+		config_struct.ClusterDetails.CloudCredentials.AccessKey = access_key
+	}
+	return config_struct
+}
+
+func UpdateEncryptedCred(initialRun bool, config_struct config.ConfigStruct) error {
+	encryptedConfigStruct, err := GetEncryptedConfigStruct(config_struct)
+	if err != nil {
+		log.Panic.Println("Error getting the encrypted config struct : ", err)
+		panic(err)
+	}
+
+	err = config.UpdateConfigFile(encryptedConfigStruct)
+	if err != nil {
+		log.Panic.Println("Error updating the encrypted config struct : ", err)
+		panic(err)
+	}
+
+	// initialize new os client connection with the updated creds
+	if !initialRun {
+		cfg := config_struct.ClusterDetails
+		osutils.InitializeOsClient(cfg.OsCredentials.OsAdminUsername, cfg.OsCredentials.OsAdminPassword)
+	}
+	return nil
+}
+
+func DecryptCredsAndInitializeConn(config_struct config.ConfigStruct) {
+	decryptedConfigStruct := GetDecryptedConfigStruct(config_struct)
+	cfg := decryptedConfigStruct.ClusterDetails
+	osutils.InitializeOsClient(cfg.OsCredentials.OsAdminUsername, cfg.OsCredentials.OsAdminPassword)
+}
+
+func UpdateSecretAndEncryptCreds(initial_run bool, config_struct config.ConfigStruct) error {
+	if initial_run {
+		if _, err := os.Stat(SecretFilepath); err == nil {
+			EncryptionSecret = GetEncryptionSecret()
 		} else if errors.Is(err, os.ErrNotExist) {
 			if utils.CheckIfMaster(context.Background(), "") {
-				GenerateAndScrambleSecret(secret_filepath)
-				// Integrate ansible script to send the secret and config to other nodes
+				GenerateAndScrambleSecret()
+				UpdateEncryptedCred(initial_run, config_struct)
+				//ansible logic to copy the secret and config
 			} else {
 				log.Info.Println("Sleeping for 20 sec for the secrets to be updated from the master node")
-				// contiuous loop to check if the secret is present in the nodes initially
+				// contiuous loop to check if the config and secret is present in the nodes initially
 				for {
 					time.Sleep(20 * time.Second)
-					if _, err := os.Stat(secret_filepath); err == nil {
-						data, err := os.ReadFile(secret_filepath)
-						if err != nil {
-							log.Panic.Println("Error reading the secret file")
-							return err
-						}
-						decoded_data, _ := Decode(string(data))
-						EncryptionSecret = getScrambledOrOriginalSecret(string(decoded_data), false)
+					if _, err := os.Stat(SecretFilepath); err == nil {
+						EncryptionSecret = GetEncryptionSecret()
 						break
 					} else if errors.Is(err, os.ErrNotExist) {
 						log.Warn.Println("Secret file not yet created")
 					} else {
-						log.Panic.Println("Error in reading secret file")
+						log.Panic.Println("Error in reading secret file : ", err)
 						panic(err)
 					}
 				}
 			}
 		} else {
-			log.Panic.Println("Error in reading secret file")
+			log.Panic.Println("Error in reading secret file : ", err)
 			panic(err)
 		}
 	} else {
-		GenerateAndScrambleSecret(secret_filepath)
-		// Integrate ansible script to send the secret and config to other nodes
+		if utils.CheckIfMaster(context.Background(), "") {
+			decrypted_struct := GetDecryptedConfigStruct(config_struct)
+			GenerateAndScrambleSecret()
+			UpdateEncryptedCred(initial_run, decrypted_struct)
+			//ansible logic to copy the secret and config
+		} else {
+			EncryptionSecret = GetEncryptionSecret()
+			DecryptCredsAndInitializeConn(config_struct)
+
+		}
 	}
+
 	return nil
+}
+
+func CredsMismatch(currentConfigStruct config.ConfigStruct, previousConfigStruct config.ConfigStruct) bool {
+	if (currentConfigStruct.ClusterDetails.OsCredentials.OsAdminUsername != previousConfigStruct.ClusterDetails.OsCredentials.OsAdminUsername) ||
+		(currentConfigStruct.ClusterDetails.OsCredentials.OsAdminPassword != previousConfigStruct.ClusterDetails.OsCredentials.OsAdminPassword) ||
+		(currentConfigStruct.ClusterDetails.CloudCredentials.SecretKey != previousConfigStruct.ClusterDetails.CloudCredentials.SecretKey) ||
+		(currentConfigStruct.ClusterDetails.CloudCredentials.AccessKey != previousConfigStruct.ClusterDetails.CloudCredentials.AccessKey) {
+		return true
+	}
+	return false
 }
 
 // Encode the given byte value
@@ -143,7 +230,6 @@ func Encode(b []byte) string {
 func Encrypt(text, EncryptionSecret string) (string, error) {
 	block, err := aes.NewCipher([]byte(EncryptionSecret))
 	if err != nil {
-		log.Error.Println("Error while creating cipher during encryption : ", err)
 		return "", err
 	}
 	plainText := []byte(text)
@@ -161,7 +247,7 @@ func Decode(s string) ([]byte, error) {
 			log.Panic.Println("Error while decoding : ", err)
 			panic(err)
 		} else {
-			return nil, err
+			return data, err
 		}
 	}
 	return data, nil
@@ -190,7 +276,6 @@ func Decrypt(text, EncryptionSecret string) (string, error) {
 func GetEncryptedData(toBeEncrypted string) (string, error) {
 	encText, err := Encrypt(toBeEncrypted, EncryptionSecret)
 	if err != nil {
-		log.Error.Println("Error encrypting your classified text: ", err)
 		return "", err
 	} else {
 		_, err := Decrypt(encText, EncryptionSecret)
