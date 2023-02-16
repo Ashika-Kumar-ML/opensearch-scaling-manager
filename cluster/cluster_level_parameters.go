@@ -13,8 +13,8 @@ package cluster
 import (
 	"context"
 	"encoding/json"
-	"scaling_manager/logger"
-	osutils "scaling_manager/opensearchUtils"
+	"github.com/maplelabs/opensearch-scaling-manager/logger"
+	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 	"strconv"
 )
 
@@ -59,26 +59,26 @@ type Node struct {
 // This struct will contain the static metrics of the cluster.
 type ClusterStatic struct {
 	// ClusterName indicates the Cluster name for the OpenSearch cluster.
-	ClusterName string `yaml:"cluster_name" validate:"required,isValidName"`
+	ClusterName string `yaml:"cluster_name" validate:"required,isValidName" json:"cluster_name"`
 	// IpAddress indicate the master node IP for the OpenSearch cluster.
-	IpAddress string `yaml:"ip_address" validate:"required,ip"`
+	IpAddress string `yaml:"ip_address" validate:"required,ip" json:"ip_address"`
 	// CloudType indicate the type of the cloud service where the OpenSearch cluster is deployed.
-	CloudType string `yaml:"cloud_type" validate:"required,oneof=AWS GCP AZURE"`
+	CloudType string `yaml:"cloud_type" validate:"required,oneof=AWS GCP AZURE" json:"cloud_type"`
 	// BaseNodeType indicate the instance type of the node.
 	// This parameters depends on the cloud service.
-	BaseNodeType string `yaml:"base_node_type" validate:"required"`
+	BaseNodeType string `yaml:"base_node_type" validate:"required" json:"base_node_type"`
 	// NumCpusPerNode indicates the number of the CPU core running on a node in a cluster.
-	NumCpusPerNode int `yaml:"number_cpus_per_node" validate:"required,min=1"`
+	NumCpusPerNode int `yaml:"number_cpus_per_node" validate:"required,min=1" json:"number_cpus_per_node"`
 	// RAMPerNodeInGB indicates the RAM size in GB running on a node in a cluster.
-	RAMPerNodeInGB int `yaml:"ram_per_node_in_gb" validate:"required,min=1"`
+	RAMPerNodeInGB int `yaml:"ram_per_node_in_gb" validate:"required,min=1" json:"ram_per_node_in_gb"`
 	// DiskPerNodeInGB indicates the Disk size in GB running on a node in a cluster.
-	DiskPerNodeInGB int `yaml:"disk_per_node_in_gb" validate:"required,min=1"`
+	DiskPerNodeInGB int `yaml:"disk_per_node_in_gb" validate:"required,min=1" json:"disk_per_node_in_gb"`
 	// NumMaxNodesAllowed indicates the number of maximum allowed node present in the cluster.
 	// Based on this value we will determine whether to scale out further or not.
-	MaxNodesAllowed int `yaml:"max_nodes_allowed" validate:"required,min=1"`
+	MaxNodesAllowed int `yaml:"max_nodes_allowed" validate:"required,min=1" json:"max_nodes_allowed"`
 	// MinNodesAllowed indicates the number of minimum nodes a cluster should have at any point
 	// Based on this value we will determine whether to scale in further or not.
-	MinNodesAllowed int `yaml:"min_nodes_allowed" validate:"required,min=1"`
+	MinNodesAllowed int `yaml:"min_nodes_allowed" validate:"required,min=1" json:"min_nodes_allowed"`
 }
 
 // This struct will contain the dynamic metrics of the cluster.

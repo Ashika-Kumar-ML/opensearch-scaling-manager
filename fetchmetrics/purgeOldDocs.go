@@ -2,7 +2,7 @@ package fetchmetrics
 
 import (
 	"context"
-	osutils "scaling_manager/opensearchUtils"
+	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 	"strconv"
 )
 

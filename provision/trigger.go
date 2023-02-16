@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"regexp"
-	"scaling_manager/cluster"
-	"scaling_manager/cluster_sim"
-	"scaling_manager/config"
-	osutils "scaling_manager/opensearchUtils"
-	utils "scaling_manager/utilities"
+	"github.com/maplelabs/opensearch-scaling-manager/cluster"
+	"github.com/maplelabs/opensearch-scaling-manager/cluster_sim"
+	"github.com/maplelabs/opensearch-scaling-manager/config"
+	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
+	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 	"strconv"
 	"strings"
 	"time"
@@ -57,7 +57,7 @@ func GetRecommendation(state *State, recommendationQueue []map[string]string, cl
 			}
 
 			ruleResponsible := recommendationQueue[0][task]
-			numNodesProceed := checkNumNodesCondition(operation, clusterCfg)
+			numNodesProceed := checkNumNodesCondition(operation, clusterCfg, usrCfg)
 			previousProvisionProceed := comparePreviousProvision(ruleResponsible, operation)
 			if !numNodesProceed || !previousProvisionProceed {
 				return
@@ -117,8 +117,14 @@ func getLatestProvisionQuery() string {
 // Return:
 //
 //	(bool): Returns a bool value to decide to proceed with provisioning or drop the recommendation
-func checkNumNodesCondition(operation string, clusterCfg config.ClusterDetails) bool {
-	numNodes := len(utils.GetNodes())
+func checkNumNodesCondition(operation string, clusterCfg config.ClusterDetails, usrCfg config.UserConfig) bool {
+	var numNodes int
+	if usrCfg.MonitorWithSimulator {
+		clusterDynamic := cluster_sim.GetClusterCurrent(usrCfg.IsAccelerated)
+		numNodes = clusterDynamic.NumNodes
+	} else {
+		numNodes = len(utils.GetNodes())
+	}
 	switch operation {
 	case "scale_up":
 		if numNodes+1 > clusterCfg.MaxNodesAllowed {
@@ -135,14 +141,17 @@ func checkNumNodesCondition(operation string, clusterCfg config.ClusterDetails) 
 }
 
 // Input:
+//
 //	ruleResponsible (string): The rule responsible for recommendation with delimiters. The last value would contain the decision period of the rule
 //	operation (string): The operation recommended (scale_up or scale_down)
 //
 // Description:
+//
 //	Compares if the the largest decision period of the rules responsible for recommendation overlaps with the previous Provision
 //	Returns false if the above condition is met, as no provision should take place in this case. Return true otherwise
 //
 // Return:
+//
 //	(bool): Returns a bool value to decide to proceed with provisioning or drop the recommendation
 func comparePreviousProvision(ruleResponsible string, operation string) bool {
 	// Split the rules if more than one rule is responsible for recommendation

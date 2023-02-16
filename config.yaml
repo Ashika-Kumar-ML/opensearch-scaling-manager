@@ -7,6 +7,8 @@ user_config:
   is_accelerated: false
 cluster_details:
   ip_address: 10.81.1.250
+  launch_template_id: "abc"
+  launch_template_version: "1"
   # opensearch cluster name
   cluster_name: cluster.1
   # opensearch credentials
@@ -25,6 +27,7 @@ cluster_details:
   cloud_credentials:
     secret_key: secret_key
     access_key: access_key
+    pem_file_path: /usr/share/pemfile.pem
   base_node_type: t2x.large
   number_cpus_per_node: 5
   ram_per_node_in_gb: 10

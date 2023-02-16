@@ -4,9 +4,9 @@ import (
 	"io/ioutil"
 	"os"
 	"regexp"
-	"scaling_manager/cluster"
-	"scaling_manager/logger"
-	"scaling_manager/recommendation"
+	"github.com/maplelabs/opensearch-scaling-manager/cluster"
+	"github.com/maplelabs/opensearch-scaling-manager/logger"
+	"github.com/maplelabs/opensearch-scaling-manager/recommendation"
 
 	"github.com/go-playground/validator/v10"
 	"gopkg.in/yaml.v3"
@@ -30,29 +30,32 @@ func init() {
 // This struct contains the OS Admin Username and OS Admin Password via which we can connect to OS cluster.
 type OsCredentials struct {
 	// OsAdminUsername indicates the OS Admin Username via which OS client can connect to OS Cluster.
-	OsAdminUsername string `yaml:"os_admin_username" validate:"required"`
+	OsAdminUsername string `yaml:"os_admin_username" validate:"required" json:"os_admin_username"`
 	// OsAdminPassword indicates the OS Admin Password via which OS client can connect to OS Cluster.
-	OsAdminPassword string `yaml:"os_admin_password" validate:"required"`
+	OsAdminPassword string `yaml:"os_admin_password" validate:"required" json:"os_admin_password"`
 }
 
 // This struct contains the Cloud Secret Key and Access Key via which we can connect to the cloud.
 type CloudCredentials struct {
+	PemFilePath string `yaml:"pem_file_path" validate:"required" json:"pem_file_path"`
 	// SecretKey indicates the Secret key for connecting to the cloud.
-	SecretKey string `yaml:"secret_key" validate:"required"`
+	SecretKey string `yaml:"secret_key" validate:"required" json:"secret_key"`
 	// AccessKey indicates the Access key for connecting to the cloud.
-	AccessKey string `yaml:"access_key" validate:"required"`
+	AccessKey string `yaml:"access_key" validate:"required" json:"access_key"`
 }
 
 // This struct contains the data structure to parse the cluster details present in the configuration file.
 type ClusterDetails struct {
 	// ClusterStatic indicates the static configuration for the cluster.
 	cluster.ClusterStatic `yaml:",inline"`
-	SshUser               string           `yaml:"os_user" validate:"required"`
-	OpensearchVersion     string           `yaml:"os_version" validate:"required"`
-	OpensearchHome        string           `yaml:"os_home" validate:"required"`
-	DomainName            string           `yaml:"domain_name" validate:"required"`
-	OsCredentials         OsCredentials    `yaml:"os_credentials"`
-	CloudCredentials      CloudCredentials `yaml:"cloud_credentials"`
+	LaunchTemplateId      string           `yaml:"launch_template_id" validate:"required" json:"launch_template_id"`
+	LaunchTemplateVersion string           `yaml:"launch_template_version" validate:"required" json:"launch_template_version"`
+	SshUser               string           `yaml:"os_user" validate:"required" json:"os_user"`
+	OpensearchVersion     string           `yaml:"os_version" validate:"required" json:"os_version"`
+	OpensearchHome        string           `yaml:"os_home" validate:"required" json:"os_home"`
+	DomainName            string           `yaml:"domain_name" validate:"required" json:"domain_name"`
+	OsCredentials         OsCredentials    `yaml:"os_credentials" json:"os_credentials"`
+	CloudCredentials      CloudCredentials `yaml:"cloud_credentials" json:"cloud_credentials"`
 }
 
 // Config for application behaviour from user

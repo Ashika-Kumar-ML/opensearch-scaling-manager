@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"os/exec"
-	"scaling_manager/cluster"
-	osutils "scaling_manager/opensearchUtils"
-	utils "scaling_manager/utilities"
+	"github.com/maplelabs/opensearch-scaling-manager/cluster"
+	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
+	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 	"strconv"
 	"strings"
 )

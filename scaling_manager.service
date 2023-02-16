@@ -5,8 +5,8 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/usr/local/scaling_manager_lib
-ExecStart=/usr/local/scaling_manager_lib/scaling_manager
-ExecStop=/bin/bash -c "kill $(pgrep scaling_manager)"
+ExecStart=/usr/local/scaling_manager_lib/scaling_manager start
+ExecStop=/usr/local/scaling_manager_lib/scaling_manager stop
 
 [Install]
 WantedBy=multi-user.target

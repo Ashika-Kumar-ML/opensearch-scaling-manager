@@ -52,10 +52,6 @@
         name: 'opensearch'
         state: stopped
 
-    - name: Stop the instance
-      become: true
-      shell: "shutdown -h +4" 
-
     - name: Clear the exclusion of node after shutdown
       become: true
       become_user: root

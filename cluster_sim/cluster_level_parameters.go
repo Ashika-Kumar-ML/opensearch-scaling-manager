@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"scaling_manager/cluster"
-	"scaling_manager/logger"
+	"github.com/maplelabs/opensearch-scaling-manager/cluster"
+	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	"time"
 )
 

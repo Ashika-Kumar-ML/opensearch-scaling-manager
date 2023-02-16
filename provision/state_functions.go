@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	osutils "scaling_manager/opensearchUtils"
-	utils "scaling_manager/utilities"
+	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
+	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 )
 
 // A global variable which stores the document ID of the State document that will to stored and fetched frm Opensearch

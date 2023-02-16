@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"hash/fnv"
-	"scaling_manager/logger"
-	osutils "scaling_manager/opensearchUtils"
+	"github.com/maplelabs/opensearch-scaling-manager/logger"
+	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 )
 
 // A global logger variable used across the package for logging.

@@ -11,9 +11,9 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"scaling_manager/cluster"
-	"scaling_manager/cluster_sim"
-	"scaling_manager/logger"
+	"github.com/maplelabs/opensearch-scaling-manager/cluster"
+	"github.com/maplelabs/opensearch-scaling-manager/cluster_sim"
+	"github.com/maplelabs/opensearch-scaling-manager/logger"
 	"strings"
 )
 

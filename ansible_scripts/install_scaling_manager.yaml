@@ -31,7 +31,7 @@
   - name: Check if make is installed
     become: yes
     command: dpkg-query -W -f='${Status}' make | grep 'install ok installed'
-    register: is_make_installed
+    register: is_installed
     failed_when: no
     changed_when: no
   - name: Install make if not installed
@@ -40,20 +40,7 @@
       name: make
       state: latest
       update_cache: yes
-    when: is_make_installed.rc != 0
-  - name: Check if ansible is installed
-    become: yes
-    command: dpkg-query -W -f='${Status}' ansible | grep 'install ok installed'
-    register: is_ansible_installed
-    failed_when: no
-    changed_when: no
-  - name: Install ansible if not installed
-    become: yes
-    apt:
-      name: ansible
-      state: latest
-      update_cache: yes
-    when: is_ansible_installed.rc != 0
+    when: is_installed.rc != 0
   - name: Installing Scalling Manager
     shell:
     args:
@@ -70,21 +57,6 @@
         src: "{{ config_path | default('/usr/local/scaling_manager_lib/config.yaml') }}"
         dest: /usr/local/scaling_manager_lib
   tags: update_config
-- name: Update secret
-  hosts: all
-  tasks:
-  - name: Check that the secret.txt exists
-    #host: localhost
-    stat:
-      path: /usr/local/scaling_manager_lib/.secret.txt
-    register: stat_result
-  - name: Transfer the secret file
-    become: yes
-    copy:
-        src: "{{ secret_path | default('/usr/local/scaling_manager_lib/.secret.txt') }}"
-        dest: /usr/local/scaling_manager_lib
-    when: not stat_result.stat.exists
-  tags: update_secret
 - name: Start Scaling manager
   hosts: all
   tasks:

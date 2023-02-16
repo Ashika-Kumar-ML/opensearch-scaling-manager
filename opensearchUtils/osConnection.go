@@ -6,7 +6,7 @@ import (
 	_ "embed"
 	"net/http"
 	"os"
-	"scaling_manager/logger"
+	"github.com/maplelabs/opensearch-scaling-manager/logger"
 
 	opensearch "github.com/opensearch-project/opensearch-go"
 	osapi "github.com/opensearch-project/opensearch-go/opensearchapi"

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"scaling_manager/logger"
-	utils "scaling_manager/utilities"
+	"github.com/maplelabs/opensearch-scaling-manager/logger"
+	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 )
 
 var ctx = context.Background()

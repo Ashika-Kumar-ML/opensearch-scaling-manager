@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"scaling_manager/cluster"
-	osutils "scaling_manager/opensearchUtils"
+	"github.com/maplelabs/opensearch-scaling-manager/cluster"
+	osutils "github.com/maplelabs/opensearch-scaling-manager/opensearchUtils"
 )
 
 // ClusterMetrics holds the cluster level parameters that are to be populated and indexed into opensearch

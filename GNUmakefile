@@ -45,7 +45,8 @@ cleaninstall:
     endif
 
 init:
-	go mod init scaling_manager
+	go mod init github.com/maplelabs/opensearch-scaling-manager
+	go get -u github.com/knadh/koanf
 	go mod tidy
 
 clobber:

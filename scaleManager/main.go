@@ -1,16 +1,18 @@
-package main
+package scaleManager
 
 import (
 	"context"
-	"scaling_manager/config"
-	"scaling_manager/crypto"
-	fetch "scaling_manager/fetchmetrics"
-	"scaling_manager/logger"
-	"scaling_manager/provision"
-	"scaling_manager/recommendation"
-	utils "scaling_manager/utilities"
+	"os"
 	"strings"
 	"time"
+
+	"github.com/maplelabs/opensearch-scaling-manager/config"
+	"github.com/maplelabs/opensearch-scaling-manager/crypto"
+	fetch "github.com/maplelabs/opensearch-scaling-manager/fetchmetrics"
+	"github.com/maplelabs/opensearch-scaling-manager/logger"
+	"github.com/maplelabs/opensearch-scaling-manager/provision"
+	"github.com/maplelabs/opensearch-scaling-manager/recommendation"
+	utils "github.com/maplelabs/opensearch-scaling-manager/utilities"
 
 	"github.com/fsnotify/fsnotify"
 	"github.com/tkuchiki/faketime"
@@ -37,7 +39,7 @@ var seed = time.Now().Unix()
 //	Starts the fetchMetrics module to start collecting the data and dump into Opensearch (if userCfg.MonitorWithSimulator is false)
 //
 // Return:
-func init() {
+func Initialize() {
 	log.Init("logger")
 	log.Info.Println("Main module initialized")
 
@@ -69,7 +71,7 @@ func init() {
 //		# Checks if the current node is master, reads the config file, gets the recommendation from recommendation engine and triggers provisioning
 //
 // Return:
-func main() {
+func Run() {
 	var t = new(time.Time)
 	t_now := time.Now()
 	*t = time.Date(t_now.Year(), t_now.Month(), t_now.Day(), 0, 0, 0, 0, time.UTC)
@@ -85,6 +87,12 @@ func main() {
 	go periodicProvisionCheck(configStruct.UserConfig.PollingInterval, t)
 	ticker := time.Tick(time.Duration(configStruct.UserConfig.PollingInterval) * time.Second)
 	for range ticker {
+		var isMaster bool
+		if configStruct.UserConfig.MonitorWithSimulator {
+			isMaster = true
+		} else {
+			isMaster = utils.CheckIfMaster(context.Background(), "")
+		}
 		if configStruct.UserConfig.MonitorWithSimulator && configStruct.UserConfig.IsAccelerated {
 			f := faketime.NewFaketimeWithTime(*t)
 			defer f.Undo()
@@ -92,7 +100,7 @@ func main() {
 		}
 		state.GetCurrentState()
 		// The recommendation and provisioning should only happen on master node
-		if utils.CheckIfMaster(context.Background(), "") && state.CurrentState == "normal" {
+		if isMaster && state.CurrentState == "normal" {
 			//              if firstExecution || state.CurrentState == "normal" {
 			firstExecution = false
 			// This function will be responsible for parsing the config file and fill in task_details struct.
@@ -222,4 +230,26 @@ func fileWatch(previousConfigStruct config.ConfigStruct) {
 		log.Error.Println("Error while adding the config file changes to the fileWatcher :", err)
 	}
 	<-done
+}
+
+// Input:
+//
+// Description:
+//
+//		The function performs graceful shutdown of application
+//	 	based on current state of provision.
+//		It will wait till provision is completed and exits.
+//
+// Return:
+func CleanUp() {
+	log.Info.Println("Checking State before Termination")
+	for {
+		state.GetCurrentState()
+		if state.CurrentState == "normal" || state.CurrentState == "provisioning_scaledown_completed" || state.CurrentState == "provisioning_scaleup_completed" {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	log.Info.Println("Exiting Scale Manager")
+	os.Exit(0)
 }
